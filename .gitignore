@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+data/*.npy
+samples.png
+training_curves.png
+solved.png
+image2.jpg
+image3.jpg
+image4.jpg
+sudoku1.png
+tree.txt
+.streamlit/secrets.toml
