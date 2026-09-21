@@ -11,3 +11,5 @@ image4.jpg
 sudoku1.png
 tree.txt
 .streamlit/secrets.toml
+pyproject.toml
+uv.lock
