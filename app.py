@@ -10,6 +10,7 @@ import cv2
 import streamlit as st
 import tensorflow as tf
 
+from sudoku_solver.uploader import optimized_image_uploader
 from sudoku_solver import solve_sudoku_from_image
 from sudoku_solver.styles import CUSTOM_CSS, render_board_html
 
@@ -99,18 +100,92 @@ st.markdown(
 
 
 # ============================================================
-# Upload Section
+# Upload
 # ============================================================
+st.markdown("### Upload image")
 
-col_upload, col_info = st.columns([5, 4], gap="large")
+with st.expander("⚙️ Upload options", expanded=False):
+    col_a, col_b = st.columns(2)
+    with col_a:
+        max_dim = st.slider(
+            "Max dimension (px)",
+            min_value=400, max_value=2000, value=1000, step=100,
+            help="Larger = better detail, but bigger upload.",
+        )
+    with col_b:
+        quality = st.slider(
+            "JPEG quality",
+            min_value=0.5, max_value=0.95, value=0.85, step=0.05,
+            help="Lower = smaller file, faster upload.",
+        )
 
-with col_upload:
-    st.markdown("### Upload image")
+# کامپوننت سفارشی
+uploaded = optimized_image_uploader(
+    max_dimension=max_dim,
+    quality=quality,
+    key="sudoku_uploader",
+)
 
-    uploaded_file = st.file_uploader(
-        "Upload a Sudoku image",
-        type=["jpg", "jpeg", "png", "bmp", "webp"],
-        label_visibility="collapsed",
+
+# ============================================================
+# If no image yet
+# ============================================================
+if uploaded is None:
+    st.markdown(
+        """
+        <div class="empty-state" style="margin-top:1.5rem;">
+            <span class="icon">📷</span>
+            <h3>No image yet</h3>
+            <p>Drop or choose a Sudoku photo to get started</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.stop()
+
+
+# ============================================================
+# Decode the optimized bytes
+# ============================================================
+img_bytes = uploaded["bytes"]  # np.uint8 array directly from component
+img_array = np.frombuffer(bytes(img_bytes), dtype=np.uint8)
+img_bgr = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+if img_bgr is None:
+    st.error("❌ Could not decode image.")
+    st.stop()
+
+# ============================================================
+# Show upload stats
+# ============================================================
+orig_kb = uploaded["original_size"] / 1024
+new_kb = uploaded["optimized_size"] / 1024
+saving = (1 - uploaded["optimized_size"] / uploaded["original_size"]) * 100
+
+m1, m2, m3 = st.columns(3)
+m1.metric("Original", f"{orig_kb:.1f} KB")
+m2.metric("Optimized", f"{new_kb:.1f} KB", delta=f"−{saving:.0f}%")
+m3.metric("Dimensions", f"{uploaded['width']}×{uploaded['height']}")
+
+
+# ============================================================
+# Continue with the same pipeline as before
+# ============================================================
+col_preview, col_action = st.columns([3, 2], gap="large")
+
+with col_preview:
+    st.markdown("### Preview")
+    st.image(
+        cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB),
+        use_container_width=True,
+    )
+
+with col_action:
+    st.markdown("### Ready to solve?")
+    solve_clicked = st.button(
+        "🚀  Solve puzzle",
+        type="primary",
+        use_container_width=True,
     )
 
 # ────────────────────────────────────────────────────────────
@@ -131,35 +206,6 @@ with col_info:
         """,
         unsafe_allow_html=True,
     )
-
-# ============================================================
-# If no file uploaded — empty state
-# ============================================================
-
-if uploaded_file is None:
-    st.markdown(
-        """
-        <div class="empty-state" style="margin-top:1.5rem;">
-            <span class="icon">📷</span>
-            <h3>No image yet</h3>
-            <p>Upload a Sudoku photo above to get started</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.stop()
-
-
-# ============================================================
-# Process the uploaded file
-# ============================================================
-
-file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-
-if img_bgr is None:
-    st.error("❌ Invalid file. Please upload a valid image.")
-    st.stop()
 
 
 # ============================================================
