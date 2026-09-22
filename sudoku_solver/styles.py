@@ -125,7 +125,7 @@ html, body, [class*="css"], .stApp {
 }
 
 /* ============================================================
-   Streamlit chrome — hide only what's safe, keep sidebar toggle
+   Streamlit chrome — keep sidebar toggle visible
    ============================================================ */
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
@@ -142,21 +142,25 @@ header[data-testid="stHeader"] {
 [data-testid="collapsedControl"],
 [data-testid="stSidebarCollapseButton"] {
     visibility: visible !important;
-    display: flex !important;
+    opacity: 1 !important;
+    position: fixed !important;
+    top: 0.5rem !important;
+    left: 0.5rem !important;
     z-index: 9999 !important;
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
     border-radius: 8px !important;
     box-shadow: var(--shadow-sm) !important;
     color: var(--text) !important;
-    margin: 0.5rem !important;
     padding: 0.4rem !important;
+    cursor: pointer !important;
 }
 
 [data-testid="collapsedControl"]:hover,
 [data-testid="stSidebarCollapseButton"]:hover {
     border-color: var(--primary) !important;
     color: var(--primary) !important;
+    transform: scale(1.05) !important;
 }
 
 [data-testid="collapsedControl"] svg,
