@@ -132,15 +132,15 @@ footer { visibility: hidden; }
 [data-testid="stToolbar"]    { display: none; }
 [data-testid="stDecoration"] { display: none; }
 
-/* Keep the header transparent but NOT hidden —
-   the sidebar collapse/expand button lives inside it. */
+/* Header transparent instead of hidden */
 header[data-testid="stHeader"] {
     background: transparent !important;
     box-shadow: none !important;
 }
 
-/* Make the sidebar toggle always visible and clickable */
-[data-testid="collapsedControl"] {
+/* Show the sidebar toggle button for both old and new Streamlit versions */
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapseButton"] {
     visibility: visible !important;
     display: flex !important;
     z-index: 9999 !important;
@@ -150,13 +150,19 @@ header[data-testid="stHeader"] {
     box-shadow: var(--shadow-sm) !important;
     color: var(--text) !important;
     margin: 0.5rem !important;
+    padding: 0.4rem !important;
 }
 
-[data-testid="collapsedControl"]:hover {
+[data-testid="collapsedControl"]:hover,
+[data-testid="stSidebarCollapseButton"]:hover {
     border-color: var(--primary) !important;
     color: var(--primary) !important;
 }
 
+[data-testid="collapsedControl"] svg,
+[data-testid="stSidebarCollapseButton"] svg {
+    fill: currentColor !important;
+}
 /* Layout */
 .main .block-container {
     max-width: 1180px;
