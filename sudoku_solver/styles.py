@@ -125,79 +125,103 @@ html, body, [class*="css"], .stApp {
 }
 
 /* ============================================================
-   Streamlit chrome — keep sidebar toggle visible
+   SIDEBAR TOGGLE BUTTON (Open / Close)
    ============================================================ */
+
 /* حذف نکن کل toolbar — فقط آیتم‌های اضافی */
 [data-testid="stToolbarActions"],
 [data-testid="stStatusWidget"] {
     display: none !important;
 }
 
-/* دکمهٔ باز کردن سایدبار (هر دو نسخهٔ قدیم و جدید) */
+/* دکمهٔ باز کردن سایدبار — هر دو نسخه (قدیم و جدید) */
 [data-testid="stSidebarCollapsedControl"],
 [data-testid="collapsedControl"] {
     visibility: visible !important;
     opacity: 1 !important;
-    display: block !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
     position: fixed !important;
-    top: 0.75rem !important;
-    left: 0.75rem !important;
+    top: 0.85rem !important;
+    left: 0.85rem !important;
     z-index: 1000000 !important;
+
+    width: 42px !important;
+    height: 42px !important;
+    padding: 0 !important;
+
     background: var(--surface) !important;
     border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
+    border-radius: 12px !important;
     box-shadow: var(--shadow-sm) !important;
     color: var(--text) !important;
-    padding: 0.4rem !important;
+
     cursor: pointer !important;
+    transition: background 0.18s ease, border-color 0.18s ease,
+                color 0.18s ease, transform 0.18s ease,
+                box-shadow 0.18s ease !important;
 }
 
-[data-testid="stSidebarCollapsedControl"]:hover,
-[data-testid="collapsedControl"]:hover {
-    border-color: var(--primary) !important;
-    color: var(--primary) !important;
-}
-
+/* آیکون داخل دکمه */
 [data-testid="stSidebarCollapsedControl"] svg,
 [data-testid="collapsedControl"] svg {
+    width: 20px !important;
+    height: 20px !important;
     fill: currentColor !important;
-}
-#MainMenu { visibility: hidden; }
-footer { visibility: hidden; }
-[data-testid="stDecoration"] { display: none; }
-
-/* Header transparent instead of hidden */
-header[data-testid="stHeader"] {
-    background: transparent !important;
-    box-shadow: none !important;
+    transition: transform 0.18s ease !important;
 }
 
-/* Show the sidebar toggle button for both old and new Streamlit versions */
-[data-testid="collapsedControl"],
-[data-testid="stSidebarCollapseButton"] {
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: fixed !important;
-    top: 0.5rem !important;
-    left: 0.5rem !important;
-    z-index: 9999 !important;
-    background: var(--surface) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
-    box-shadow: var(--shadow-sm) !important;
-    color: var(--text) !important;
-    padding: 0.4rem !important;
-    cursor: pointer !important;
-}
-
-[data-testid="collapsedControl"]:hover,
-[data-testid="stSidebarCollapseButton"]:hover {
+/* حالت هاور */
+[data-testid="stSidebarCollapsedControl"]:hover,
+[data-testid="collapsedControl"]:hover {
+    background: var(--primary-soft) !important;
     border-color: var(--primary) !important;
     color: var(--primary) !important;
-    transform: scale(1.05) !important;
+    box-shadow: var(--shadow-md) !important;
+    transform: translateY(-1px) scale(1.04) !important;
 }
 
-[data-testid="collapsedControl"] svg,
+/* حرکت جزئی آیکون در هاور */
+[data-testid="stSidebarCollapsedControl"]:hover svg,
+[data-testid="collapsedControl"]:hover svg {
+    transform: translateX(2px) !important;
+}
+
+/* حالت کلیک */
+[data-testid="stSidebarCollapsedControl"]:active,
+[data-testid="collapsedControl"]:active {
+    transform: translateY(0) scale(0.97) !important;
+    box-shadow: var(--shadow-xs) !important;
+}
+
+/* حالت فوکوس برای دسترس‌پذیری (کیبورد) */
+[data-testid="stSidebarCollapsedControl"]:focus-visible,
+[data-testid="collapsedControl"]:focus-visible {
+    outline: 2px solid var(--primary) !important;
+    outline-offset: 2px !important;
+}
+
+/* ============================================================
+   دکمهٔ بستن سایدبار (وقتی سایدبار باز است)
+   ============================================================ */
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stSidebarCollapseButton"] {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-muted) !important;
+    border-radius: 8px !important;
+    padding: 0.35rem !important;
+    transition: background 0.15s ease, color 0.15s ease !important;
+}
+
+[data-testid="stSidebarCollapseButton"] button:hover,
+[data-testid="stSidebarCollapseButton"]:hover {
+    background: var(--surface-hover) !important;
+    color: var(--primary) !important;
+}
+
 [data-testid="stSidebarCollapseButton"] svg {
     fill: currentColor !important;
 }
@@ -694,6 +718,16 @@ details summary:hover { color: var(--primary) !important; }
    RESPONSIVE
    ============================================================ */
 @media (max-width: 768px) {
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] {
+        top: 0.5rem !important;
+        left: 0.5rem !important;
+        width: 44px !important;
+        height: 44px !important;
+    }
+    .app-header {
+        padding-left: 3rem;
+    }
     .sudoku-board {
         grid-template-columns: repeat(9, 34px);
         grid-template-rows: repeat(9, 34px);
