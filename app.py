@@ -3,8 +3,6 @@ Sudoku Solver — Streamlit Web App
 Run: uv run streamlit run app.py
 """
 
-import io
-import os
 import numpy as np
 import cv2
 import streamlit as st
@@ -18,21 +16,18 @@ from sudoku_solver.styles import CUSTOM_CSS, render_board_html
 # ============================================================
 # Page Config
 # ============================================================
-
 st.set_page_config(
     page_title="Sudoku Solver",
     page_icon="🧩",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
 # ============================================================
-# Model Loading (cached)
+# Model Loading
 # ============================================================
-
 @st.cache_resource(show_spinner=False)
 def load_model():
     return tf.keras.models.load_model("digit_model.keras")
@@ -41,19 +36,12 @@ def load_model():
 # ============================================================
 # Sidebar
 # ============================================================
-
-# ────────────────────────────────────────────────────────────
-# Sidebar — "About" section
-# ────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## Settings")
 
     confidence_threshold = st.slider(
         "Confidence threshold",
-        min_value=0.0,
-        max_value=0.99,
-        value=0.70,
-        step=0.05,
+        min_value=0.0, max_value=0.99, value=0.70, step=0.05,
         help="Digits below this confidence will be ignored. "
              "Higher = stricter, but may drop valid digits.",
     )
@@ -80,10 +68,10 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
+
 # ============================================================
 # Header
 # ============================================================
-
 st.markdown(
     """
     <div class="app-header">
@@ -100,7 +88,7 @@ st.markdown(
 
 
 # ============================================================
-# Upload
+# Upload Section
 # ============================================================
 st.markdown("### Upload image")
 
@@ -119,7 +107,6 @@ with st.expander("⚙️ Upload options", expanded=False):
             help="Lower = smaller file, faster upload.",
         )
 
-# کامپوننت سفارشی
 uploaded = optimized_image_uploader(
     max_dimension=max_dim,
     quality=quality,
@@ -128,7 +115,7 @@ uploaded = optimized_image_uploader(
 
 
 # ============================================================
-# If no image yet
+# Empty state
 # ============================================================
 if uploaded is None:
     st.markdown(
@@ -141,57 +128,7 @@ if uploaded is None:
         """,
         unsafe_allow_html=True,
     )
-    st.stop()
 
-
-# ============================================================
-# Decode the optimized bytes
-# ============================================================
-img_bytes = uploaded["bytes"]  # np.uint8 array directly from component
-img_array = np.frombuffer(bytes(img_bytes), dtype=np.uint8)
-img_bgr = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-
-if img_bgr is None:
-    st.error("❌ Could not decode image.")
-    st.stop()
-
-# ============================================================
-# Show upload stats
-# ============================================================
-orig_kb = uploaded["original_size"] / 1024
-new_kb = uploaded["optimized_size"] / 1024
-saving = (1 - uploaded["optimized_size"] / uploaded["original_size"]) * 100
-
-m1, m2, m3 = st.columns(3)
-m1.metric("Original", f"{orig_kb:.1f} KB")
-m2.metric("Optimized", f"{new_kb:.1f} KB", delta=f"−{saving:.0f}%")
-m3.metric("Dimensions", f"{uploaded['width']}×{uploaded['height']}")
-
-
-# ============================================================
-# Continue with the same pipeline as before
-# ============================================================
-col_preview, col_action = st.columns([3, 2], gap="large")
-
-with col_preview:
-    st.markdown("### Preview")
-    st.image(
-        cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB),
-        use_container_width=True,
-    )
-
-with col_action:
-    st.markdown("### Ready to solve?")
-    solve_clicked = st.button(
-        "🚀  Solve puzzle",
-        type="primary",
-        use_container_width=True,
-    )
-
-# ────────────────────────────────────────────────────────────
-# "How it works" card
-# ────────────────────────────────────────────────────────────
-with col_info:
     st.markdown("### How it works")
     st.markdown(
         """
@@ -206,14 +143,38 @@ with col_info:
         """,
         unsafe_allow_html=True,
     )
+    st.stop()
+
+
+# ============================================================
+# Decode the optimized bytes
+# ============================================================
+img_bytes = uploaded["bytes"]
+img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+img_bgr = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+if img_bgr is None:
+    st.error("❌ Could not decode image.")
+    st.stop()
+
+
+# ============================================================
+# Upload stats
+# ============================================================
+orig_kb = uploaded["original_size"] / 1024
+new_kb  = uploaded["optimized_size"] / 1024
+saving  = (1 - uploaded["optimized_size"] / max(uploaded["original_size"], 1)) * 100
+
+m1, m2, m3 = st.columns(3)
+m1.metric("Original",   f"{orig_kb:.1f} KB")
+m2.metric("Optimized",  f"{new_kb:.1f} KB", delta=f"−{saving:.0f}%")
+m3.metric("Dimensions", f"{uploaded['width']}×{uploaded['height']}")
 
 
 # ============================================================
 # Preview + Solve
 # ============================================================
-
 st.markdown("---")
-
 col_preview, col_action = st.columns([3, 2], gap="large")
 
 with col_preview:
@@ -223,9 +184,6 @@ with col_preview:
         use_container_width=True,
     )
 
-# ────────────────────────────────────────────────────────────
-# "Ready to solve?" panel — no more inline colors
-# ────────────────────────────────────────────────────────────
 with col_action:
     st.markdown("### Ready to solve?")
     st.markdown(
@@ -245,25 +203,10 @@ with col_action:
         use_container_width=True,
     )
 
-    st.markdown(
-        """
-        <div style="margin-top:0.75rem;">
-            <div style="font-size:0.8rem; font-weight:600;
-                        color:#64748b; margin-bottom:0.4rem;">
-                Confidence threshold
-            </div>
-            <div style="font-size:0.95rem; font-weight:700;
-                        color:#4f46e5;">
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(f"**{confidence_threshold:.2f}**")
-    st.markdown("</div></div>", unsafe_allow_html=True)
 
-
-# ────────────────────────────────────────────────────────────
-# Progress callback — theme-aware
-# ────────────────────────────────────────────────────────────
+# ============================================================
+# Solve
+# ============================================================
 if solve_clicked:
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -304,90 +247,62 @@ if solve_clicked:
     st.markdown("## Results")
 
     if not solved:
-        st.error(
-            "❌ Could not solve the puzzle. "
-            "The detected board may contain an error."
-        )
+        st.error("❌ Could not solve the puzzle. "
+                 "The detected board may contain an error.")
         st.markdown("#### Detected board")
-        st.markdown(
-            render_board_html(board),
-            unsafe_allow_html=True,
-        )
+        st.markdown(render_board_html(board), unsafe_allow_html=True)
         st.stop()
 
     st.success("✅ Puzzle solved successfully")
 
-    # ===== Tabs =====
     tab1, tab2, tab3 = st.tabs(["Solution", "Detection", "Images"])
 
     with tab1:
-        given_mask = board > 0
+        given_mask  = board > 0
         solved_mask = (board == 0) & (solution > 0)
 
         col_a, col_b = st.columns(2, gap="large")
-
         with col_a:
             st.markdown('<div class="board-label">Input puzzle</div>',
                         unsafe_allow_html=True)
             st.markdown(
-                render_board_html(board,
-                                  given_mask=given_mask,
+                render_board_html(board, given_mask=given_mask,
                                   solved_mask=solved_mask),
                 unsafe_allow_html=True,
             )
-
         with col_b:
             st.markdown('<div class="board-label">Solved</div>',
                         unsafe_allow_html=True)
-            st.markdown(
-                render_board_html(solution, given_mask=given_mask),
-                unsafe_allow_html=True,
-            )
+            st.markdown(render_board_html(solution, given_mask=given_mask),
+                        unsafe_allow_html=True)
 
     with tab2:
         st.markdown('<div class="board-label">Detected by the CNN</div>',
                     unsafe_allow_html=True)
-        st.markdown(
-            render_board_html(board),
-            unsafe_allow_html=True,
-        )
+        st.markdown(render_board_html(board), unsafe_allow_html=True)
 
         with st.expander("Confidence matrix"):
-            st.markdown(
-                '<div style="font-size:0.85rem; color:#64748b; '
-                'margin-bottom:0.5rem;">Values are model confidence '
-                '(0.00 – 1.00) for each detected cell.</div>',
-                unsafe_allow_html=True,
-            )
             rows = []
             for r in range(9):
                 row = []
                 for c in range(9):
-                    if board[r, c] == 0:
-                        row.append("  ·  ")
-                    else:
-                        row.append(f"{confidences[r, c]:.2f} ")
+                    row.append("  ·  " if board[r, c] == 0
+                               else f"{confidences[r, c]:.2f} ")
                 rows.append(" ".join(row))
             st.code("\n".join(rows), language=None)
 
     with tab3:
         col_x, col_y = st.columns(2, gap="large")
-
         with col_x:
             st.markdown('<div class="board-label">Warped grid</div>',
                         unsafe_allow_html=True)
-            st.image(
-                cv2.cvtColor(warped, cv2.COLOR_BGR2RGB),
-                use_container_width=True,
-            )
-
+            st.image(cv2.cvtColor(warped, cv2.COLOR_BGR2RGB),
+                     use_container_width=True)
         with col_y:
             st.markdown('<div class="board-label">With solution (red)</div>',
                         unsafe_allow_html=True)
-            st.image(
-                cv2.cvtColor(warped_solved, cv2.COLOR_BGR2RGB),
-                use_container_width=True,
-            )
+            st.image(cv2.cvtColor(warped_solved, cv2.COLOR_BGR2RGB),
+                     use_container_width=True)
 
         _, buffer = cv2.imencode(".png", warped_solved)
         st.download_button(
@@ -400,14 +315,13 @@ if solve_clicked:
 
     # ===== Stats =====
     st.markdown("### Stats")
-
     num_detected = int(np.sum(board > 0))
-    num_solved = int(np.sum(solution > 0)) - num_detected
-    low_conf = int(np.sum((board == 0) & (confidences > 0.1)))
-    avg_conf = float(confidences[board > 0].mean()) if num_detected else 0.0
+    num_solved   = int(np.sum(solution > 0)) - num_detected
+    low_conf     = int(np.sum((board == 0) & (confidences > 0.1)))
+    avg_conf     = float(confidences[board > 0].mean()) if num_detected else 0.0
 
     m1, m2, m3, m4 = st.columns(4, gap="small")
-    m1.metric("Digits detected", f"{num_detected}/81")
-    m2.metric("Cells solved", f"{num_solved}")
-    m3.metric("Avg. confidence", f"{avg_conf * 100:.1f}%")
-    m4.metric("Low-confidence", f"{low_conf}")
+    m1.metric("Digits detected",  f"{num_detected}/81")
+    m2.metric("Cells solved",     f"{num_solved}")
+    m3.metric("Avg. confidence",  f"{avg_conf * 100:.1f}%")
+    m4.metric("Low-confidence",   f"{low_conf}")
