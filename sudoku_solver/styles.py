@@ -124,10 +124,38 @@ html, body, [class*="css"], .stApp {
     color: var(--text) !important;
 }
 
-/* Streamlit chrome */
-#MainMenu, footer, header { visibility: hidden; }
+/* ============================================================
+   Streamlit chrome — hide only what's safe, keep sidebar toggle
+   ============================================================ */
+#MainMenu { visibility: hidden; }
+footer { visibility: hidden; }
 [data-testid="stToolbar"]    { display: none; }
 [data-testid="stDecoration"] { display: none; }
+
+/* Keep the header transparent but NOT hidden —
+   the sidebar collapse/expand button lives inside it. */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* Make the sidebar toggle always visible and clickable */
+[data-testid="collapsedControl"] {
+    visibility: visible !important;
+    display: flex !important;
+    z-index: 9999 !important;
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    box-shadow: var(--shadow-sm) !important;
+    color: var(--text) !important;
+    margin: 0.5rem !important;
+}
+
+[data-testid="collapsedControl"]:hover {
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+}
 
 /* Layout */
 .main .block-container {
