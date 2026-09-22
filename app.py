@@ -72,8 +72,8 @@ with st.sidebar:
     st.markdown(
         """
         <div style="font-size:0.875rem; line-height:2;">
-            <a href="https://github.com/yourusername/sudoku-ml">📁 GitHub Repository</a><br>
-            <a href="https://github.com/yourusername/sudoku-ml/issues">🐛 Report an issue</a>
+            <a href="https://github.com/satanic-kangaroo/sudoku-ml">📁 GitHub Repository</a><br>
+            <a href="https://github.com/satanic-kangaroo/sudoku-ml/issues">🐛 Report an issue</a>
         </div>
         """,
         unsafe_allow_html=True,

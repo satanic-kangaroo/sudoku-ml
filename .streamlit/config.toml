@@ -4,7 +4,10 @@ font = "sans serif"
 
 [server]
 headless = true
-maxUploadSize = 50
+maxUploadSize = 100
+disconnectedSessionTTL = 600
+enableXsrfProtection = false
+enableCORS = false
 
 [browser]
 gatherUsageStats = false
