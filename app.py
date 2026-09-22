@@ -46,6 +46,36 @@ with st.sidebar:
              "Higher = stricter, but may drop valid digits.",
     )
 
+    st.markdown("## Solver")
+
+    solver_choice = st.radio(
+        "Algorithm",
+        options=[
+            "DLX (Dancing Links)",
+            "Backtracking (simple)",
+            "Compare both",
+        ],
+        index=0,
+        help="DLX is much faster on hard puzzles. "
+             "Compare runs both and shows the timing.",
+    )
+
+    # راهنمای کوتاه
+    if solver_choice == "DLX (Dancing Links)":
+        st.caption(
+            "🔷 Knuth's Algorithm X on an Exact Cover matrix. "
+            "Uses MRV heuristic — typically 100× faster on hard puzzles."
+        )
+    elif solver_choice == "Backtracking (simple)":
+        st.caption(
+            "🔶 Classic row-by-row DFS. "
+            "Simple and educational, but slower on hard puzzles."
+        )
+    else:
+        st.caption(
+            "⚖️ Runs both solvers and compares their timings."
+        )
+
     st.markdown("## About")
     st.markdown(
         """
@@ -218,13 +248,22 @@ if solve_clicked:
         )
         progress_bar.progress(pct)
 
-    with st.spinner("Loading model..."):
+    with st.spinner("Loading model…"):
         model = load_model()
+
+    # ← انتخاب کاربر به pipeline پاس داده می‌شه
+    compare_mode = solver_choice == "Compare both"
+    algorithm = (
+        "dlx" if solver_choice == "DLX (Dancing Links)"
+        else "backtracking"
+    )
 
     result = solve_sudoku_from_image(
         img_bgr,
         model,
         confidence_threshold=confidence_threshold,
+        algorithm=algorithm,
+        compare_mode=compare_mode,
         progress_callback=update_progress,
     )
 
@@ -242,6 +281,8 @@ if solve_clicked:
     warped_solved = result["warped_solved"]
     confidences = result["confidences"]
     solved = result["solved"]
+    used_algo = result["solver_algorithm"]
+    solver_ms = result["solver_time_ms"]
 
     st.markdown("---")
     st.markdown("## Results")
@@ -254,6 +295,57 @@ if solve_clicked:
         st.stop()
 
     st.success("✅ Puzzle solved successfully")
+       # نمایش الگوریتم و زمان
+    algo_label = {
+        "dlx": "DLX (Dancing Links)",
+        "backtracking": "Backtracking",
+    }.get(used_algo, used_algo)
+
+    col_info1, col_info2 = st.columns([2, 1])
+    with col_info1:
+        st.markdown(
+            f"**Solver:** {algo_label}",
+            unsafe_allow_html=True,
+        )
+    with col_info2:
+        st.markdown(
+            f"**Time:** `{solver_ms:.2f} ms`",
+            unsafe_allow_html=True,
+        )
+
+    # اگه Compare mode بود، جدول مقایسه نشون بده
+    if "comparison" in result:
+        cmp = result["comparison"]
+        st.markdown("### ⚖️ Solver comparison")
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric(
+            "Backtracking",
+            f"{cmp['backtracking']['time_ms']:.2f} ms",
+            delta=None,
+        )
+        c2.metric(
+            "DLX",
+            f"{cmp['dlx']['time_ms']:.2f} ms",
+            delta=f"{cmp['speedup']:.1f}× faster",
+        )
+        c3.metric(
+            "Fastest",
+            cmp["fastest"].upper(),
+        )
+
+        # نمودار میله‌ای کوچیک
+        import pandas as pd
+        chart_df = pd.DataFrame(
+            {
+                "Time (ms)": [
+                    cmp["backtracking"]["time_ms"],
+                    cmp["dlx"]["time_ms"],
+                ]
+            },
+            index=["Backtracking", "DLX"],
+        )
+        st.bar_chart(chart_df, height=180)
 
     tab1, tab2, tab3 = st.tabs(["Solution", "Detection", "Images"])
 
