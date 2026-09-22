@@ -3,42 +3,28 @@ Benchmark runner — runs each solver N times and returns statistics.
 """
 
 from __future__ import annotations
-import time
 import numpy as np
 from statistics import mean, median, stdev
 
 from .solver import solve_backtracking, solve_dlx
-from .dlx_solver import validate_solution
 
 
 def benchmark_puzzle(board: np.ndarray, runs: int = 5):
     """
     Run each solver `runs` times on the same board.
-
-    Returns:
-        {
-            "backtracking": {
-                "time_ms":  {"min": ..., "median": ..., "mean": ..., "max": ..., "std": ...},
-                "nodes":    {"min": ..., "median": ..., ...},
-                "backtracks": {...},
-                "solved":   bool,
-            },
-            "dlx": { ... same ... },
-            "winner": "dlx" | "backtracking" | "tie",
-            "speedup": float,
-        }
+    One warm-up run is executed first (excluded from stats).
     """
     result = {}
 
     for name, fn in [("backtracking", solve_backtracking), ("dlx", solve_dlx)]:
+        # Warm-up
+        fn(board)
+
         times, nodes, bts, depths = [], [], [], []
         solved_flag = False
 
-        # 1 warm-up run (excluded from stats)
-        fn(board)
-
         for _ in range(runs):
-            solved, solution, stats = fn(board)
+            solved, _, stats = fn(board)
             solved_flag = solved
             times.append(stats.time_ms)
             nodes.append(stats.nodes)
@@ -53,7 +39,6 @@ def benchmark_puzzle(board: np.ndarray, runs: int = 5):
             "max_depth":  _agg(depths),
         }
 
-    # Determine winner
     t_bt  = result["backtracking"]["time_ms"]["median"]
     t_dlx = result["dlx"]["time_ms"]["median"]
 
@@ -70,7 +55,7 @@ def benchmark_puzzle(board: np.ndarray, runs: int = 5):
     return result
 
 
-def _agg(values: list[float]) -> dict:
+def _agg(values):
     """Aggregate a list into min/median/mean/max/std."""
     if not values:
         return {"min": 0, "median": 0, "mean": 0, "max": 0, "std": 0}
@@ -83,9 +68,9 @@ def _agg(values: list[float]) -> dict:
     }
 
 
-def difficulty_label(board: np.ndarray) -> tuple[str, str, str]:
+def difficulty_label(board: np.ndarray):
     """
-    Quick heuristic difficulty based on number of givens.
+    Heuristic difficulty based on number of givens.
     Returns (label, emoji, color).
     """
     givens = int(np.sum(board > 0))

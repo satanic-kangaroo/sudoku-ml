@@ -19,9 +19,9 @@ class SolveStats:
     algorithm: str = ""
     solved: bool = False
     time_ms: float = 0.0
-    nodes: int = 0           # recursive calls
-    backtracks: int = 0      # dead-ends / rollbacks
-    max_depth: int = 0       # max recursion depth
+    nodes: int = 0
+    backtracks: int = 0
+    max_depth: int = 0
     extra: dict = field(default_factory=dict)
 
     def as_dict(self):
@@ -76,8 +76,8 @@ class _BacktrackingSolver:
         return False
 
 
-def solve_backtracking(board: np.ndarray) -> tuple[bool, np.ndarray, SolveStats]:
-    """Solve with simple backtracking; return stats."""
+def solve_backtracking(board: np.ndarray):
+    """Solve with simple backtracking; return (solved, board, stats)."""
     board_copy = board.copy()
     solver = _BacktrackingSolver()
 
@@ -100,8 +100,8 @@ def solve_backtracking(board: np.ndarray) -> tuple[bool, np.ndarray, SolveStats]
 # DLX (wraps dlx_solver)
 # ============================================================
 
-def solve_dlx(board: np.ndarray) -> tuple[bool, np.ndarray, SolveStats]:
-    """Solve with DLX; return stats."""
+def solve_dlx(board: np.ndarray):
+    """Solve with DLX; return (solved, board, stats)."""
     from .dlx_solver import solve_dlx as _solve_dlx
 
     t0 = time.perf_counter()
