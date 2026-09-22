@@ -127,9 +127,43 @@ html, body, [class*="css"], .stApp {
 /* ============================================================
    Streamlit chrome — keep sidebar toggle visible
    ============================================================ */
+/* حذف نکن کل toolbar — فقط آیتم‌های اضافی */
+[data-testid="stToolbarActions"],
+[data-testid="stStatusWidget"] {
+    display: none !important;
+}
+
+/* دکمهٔ باز کردن سایدبار (هر دو نسخهٔ قدیم و جدید) */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"] {
+    visibility: visible !important;
+    opacity: 1 !important;
+    display: block !important;
+    position: fixed !important;
+    top: 0.75rem !important;
+    left: 0.75rem !important;
+    z-index: 1000000 !important;
+    background: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    box-shadow: var(--shadow-sm) !important;
+    color: var(--text) !important;
+    padding: 0.4rem !important;
+    cursor: pointer !important;
+}
+
+[data-testid="stSidebarCollapsedControl"]:hover,
+[data-testid="collapsedControl"]:hover {
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+}
+
+[data-testid="stSidebarCollapsedControl"] svg,
+[data-testid="collapsedControl"] svg {
+    fill: currentColor !important;
+}
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
-[data-testid="stToolbar"]    { display: none; }
 [data-testid="stDecoration"] { display: none; }
 
 /* Header transparent instead of hidden */
