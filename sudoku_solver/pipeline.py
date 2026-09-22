@@ -6,14 +6,16 @@ import numpy as np
 from .detector import find_sudoku_grid, warp_perspective, extract_cells
 from .digits import predict_board
 from .solver import solve, solve_compare, is_board_consistent
+from .benchmark import benchmark_puzzle, difficulty_label
 
 
 def solve_sudoku_from_image(
     img_bgr,
     model,
-    confidence_threshold: float = 0.70,
-    algorithm: str = "dlx",
-    compare_mode: bool = False,
+    confidence_threshold=0.70,
+    algorithm="dlx",
+    compare_mode=False,
+    benchmark_runs=5,           # ← جدید
     progress_callback=None,
 ):
     """
@@ -70,39 +72,48 @@ def solve_sudoku_from_image(
     # ---- 6. Solve ----
     report("Solving…", 90)
 
+    comparison = None   
     if compare_mode:
-        report("Running both solvers…", 90)
-        comparison = solve_compare(board)
-        # Use DLX result as the canonical solution
-        used = "dlx" if comparison["dlx"]["solved"] else "backtracking"
-        solved = comparison[used]["solved"]
-        solution = comparison[used]["solution"]
-        solver_time_ms = comparison[used]["time_ms"]
+        report(f"Benchmarking ({benchmark_runs} runs each)…", 90)
+        comparison = benchmark_puzzle(board, runs=benchmark_runs)
+        # استفاده از DLX به عنوان جواب رسمی
+        used = "dlx"
+        _, solution, stats = solve(board, algorithm="dlx")
+        solver_time_ms = stats.time_ms
+        solved = stats.solved
     else:
-        solved, solution, elapsed, used = solve(board, algorithm=algorithm)
-        solver_time_ms = elapsed * 1000
-        comparison = None
+        solved, solution, stats = solve(board, algorithm=algorithm)
+        solver_time_ms = stats.time_ms
+        used = algorithm
 
-    # ---- 7. Draw ----
+    # ---- 7. Difficulty ----
+    diff_label, diff_emoji, diff_color = difficulty_label(board)
+
+    # ---- 8. Draw ----
     report("Rendering result…", 100)
     warped_solved = (
         draw_solution(warped, board, solution) if solved else warped
     )
 
     out = {
-        "board": board,
-        "solution": solution,
-        "warped": warped,
-        "warped_solved": warped_solved,
-        "confidences": confidences,
-        "solved": solved,
-        "solver_algorithm": used,
-        "solver_time_ms": solver_time_ms,
+        "board":             board,
+        "solution":          solution,
+        "warped":            warped,
+        "warped_solved":     warped_solved,
+        "confidences":       confidences,
+        "solved":            solved,
+        "solver_algorithm":  used,
+        "solver_time_ms":    solver_time_ms,
+        "solver_stats":      stats.as_dict(),
+        "difficulty": {
+            "label": diff_label,
+            "emoji": diff_emoji,
+            "color": diff_color,
+        },
     }
     if comparison is not None:
         out["comparison"] = comparison
     return out
-
 
 def draw_solution(warped, original, solution):
     """Overlay the solution (in red) on the warped grid image."""

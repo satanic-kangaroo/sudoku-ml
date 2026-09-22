@@ -186,16 +186,18 @@ def _uncover(col: Node) -> None:
 # Algorithm X (recursive search)
 # ============================================================
 
-def _search(root: Node, solution: list[int], out: list[list[int]]) -> bool:
-    """
-    Recursive Algorithm X search.
-    Appends the first solution to `out` and returns True.
-    """
+def _search(root: Node, solution: list[int], out: list[list[int]],
+            stats: dict, depth: int = 0) -> bool:
+    """Recursive Algorithm X search with instrumentation."""
+    stats["nodes"] = stats.get("nodes", 0) + 1
+    if depth > stats.get("max_depth", 0):
+        stats["max_depth"] = depth
+
     if root.R is root:
         out.append(solution.copy())
         return True
 
-    # ----- MRV heuristic: pick column with fewest nodes -----
+    # MRV heuristic
     c = root.R
     min_size = c.size
     j = c.R
@@ -204,11 +206,11 @@ def _search(root: Node, solution: list[int], out: list[list[int]]) -> bool:
             min_size = j.size
             c = j
             if min_size == 1:
-                break   # can't do better
+                break
         j = j.R
 
-    # No candidates for this column → dead end
     if min_size == 0:
+        stats["dead_ends"] = stats.get("dead_ends", 0) + 1
         return False
 
     _cover(c)
@@ -217,16 +219,14 @@ def _search(root: Node, solution: list[int], out: list[list[int]]) -> bool:
     while r is not c:
         solution.append(r.row_id)
 
-        # Cover all columns touched by this row
         j = r.R
         while j is not r:
             _cover(j.C)
             j = j.R
 
-        if _search(root, solution, out):
+        if _search(root, solution, out, stats, depth + 1):
             return True
 
-        # Backtrack: uncover in reverse order
         j = r.L
         while j is not r:
             _uncover(j.C)
@@ -234,11 +234,10 @@ def _search(root: Node, solution: list[int], out: list[list[int]]) -> bool:
 
         solution.pop()
         r = r.D
+        stats["backtracks"] = stats.get("backtracks", 0) + 1
 
     _uncover(c)
     return False
-
-
 # ============================================================
 # Public API: solve a Sudoku board
 # ============================================================
@@ -364,10 +363,14 @@ def solve_dlx(board: np.ndarray) -> tuple[bool, np.ndarray, dict]:
     stats = {
         "forbidden_rows": len(forbidden),
         "given_rows": len(given_rows),
+        "nodes": 0,
+        "backtracks": 0,
+        "dead_ends": 0,
+        "max_depth": 0,
     }
 
     solution: list[list[int]] = []
-    solved = _search(root, [], solution)
+    solved = _search(root, [], solution, stats)   # ← stats پاس داده می‌شه
 
     if not solved:
         return False, board.copy(), stats

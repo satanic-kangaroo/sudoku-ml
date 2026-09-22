@@ -313,40 +313,161 @@ if solve_clicked:
             unsafe_allow_html=True,
         )
 
-    # اگه Compare mode بود، جدول مقایسه نشون بده
-    if "comparison" in result:
-        cmp = result["comparison"]
-        st.markdown("### ⚖️ Solver comparison")
+# ══════════════════════════════════════════════════════════
+# SOLVER COMPARISON
+# ══════════════════════════════════════════════════════════
+if "comparison" in result:
+    cmp = result["comparison"]
+    diff = result.get("difficulty", {})
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric(
-            "Backtracking",
-            f"{cmp['backtracking']['time_ms']:.2f} ms",
-            delta=None,
-        )
-        c2.metric(
-            "DLX",
-            f"{cmp['dlx']['time_ms']:.2f} ms",
-            delta=f"{cmp['speedup']:.1f}× faster",
-        )
-        c3.metric(
-            "Fastest",
-            cmp["fastest"].upper(),
+    st.markdown("---")
+    st.markdown("## ⚖️ Solver comparison")
+
+    # ============ Difficulty badge ============
+    if diff:
+        st.markdown(
+            f"""
+            <div style="margin-bottom:1rem;">
+                <span class="diff-badge" style="color:{diff['color']};
+                                                border-color:{diff['color']};">
+                    {diff['emoji']} Difficulty: <b>{diff['label']}</b>
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-        # نمودار میله‌ای کوچیک
-        import pandas as pd
-        chart_df = pd.DataFrame(
-            {
-                "Time (ms)": [
-                    cmp["backtracking"]["time_ms"],
-                    cmp["dlx"]["time_ms"],
-                ]
-            },
-            index=["Backtracking", "DLX"],
+    # ============ Winner card ============
+    if cmp["winner"] == "tie":
+        st.info("🤝 Both solvers finished in almost identical time.")
+    else:
+        winner_label = {
+            "dlx": "DLX (Dancing Links)",
+            "backtracking": "Backtracking",
+        }[cmp["winner"]]
+        st.markdown(
+            f"""
+            <div class="winner-card">
+                <div class="trophy">🏆</div>
+                <div class="winner-info">
+                    <div class="winner-name">Winner: {winner_label}</div>
+                    <div class="winner-sub">
+                        {cmp['speedup']:.1f}× faster on this puzzle
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        st.bar_chart(chart_df, height=180)
 
+    # ============ Race visualization ============
+    t_bt  = cmp["backtracking"]["time_ms"]["median"]
+    t_dlx = cmp["dlx"]["time_ms"]["median"]
+    t_max = max(t_bt, t_dlx, 0.01)
+
+    pct_bt  = (t_bt  / t_max) * 100
+    pct_dlx = (t_dlx / t_max) * 100
+
+    st.markdown(
+        f"""
+        <div class="race-container">
+            <div class="race-row">
+                <div class="race-label">🔶 Backtracking</div>
+                <div class="race-track">
+                    <div class="race-bar bar-bt" style="width:{pct_bt:.1f}%;"></div>
+                </div>
+                <div class="race-time">{t_bt:.2f} ms</div>
+            </div>
+            <div class="race-row">
+                <div class="race-label">🔷 DLX</div>
+                <div class="race-track">
+                    <div class="race-bar bar-dlx" style="width:{pct_dlx:.1f}%;"></div>
+                </div>
+                <div class="race-time">{t_dlx:.2f} ms</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ============ Detailed stats table ============
+    with st.expander("📊 Detailed statistics", expanded=True):
+        st.markdown(
+            f"""
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Backtracking</th>
+                        <th>DLX</th>
+                        <th>Ratio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {_stat_row("Time — min",
+                               cmp["backtracking"]["time_ms"]["min"],
+                               cmp["dlx"]["time_ms"]["min"], "ms")}
+                    {_stat_row("Time — median",
+                               cmp["backtracking"]["time_ms"]["median"],
+                               cmp["dlx"]["time_ms"]["median"], "ms", emphasize=True)}
+                    {_stat_row("Time — mean",
+                               cmp["backtracking"]["time_ms"]["mean"],
+                               cmp["dlx"]["time_ms"]["mean"], "ms")}
+                    {_stat_row("Time — max",
+                               cmp["backtracking"]["time_ms"]["max"],
+                               cmp["dlx"]["time_ms"]["max"], "ms")}
+                    {_stat_row("Time — std dev",
+                               cmp["backtracking"]["time_ms"]["std"],
+                               cmp["dlx"]["time_ms"]["std"], "ms", no_ratio=True)}
+                    {_stat_row("Nodes explored",
+                               cmp["backtracking"]["nodes"]["median"],
+                               cmp["dlx"]["nodes"]["median"], "", integer=True)}
+                    {_stat_row("Backtracks / dead-ends",
+                               cmp["backtracking"]["backtracks"]["median"],
+                               cmp["dlx"]["backtracks"]["median"], "", integer=True)}
+                    {_stat_row("Max recursion depth",
+                               cmp["backtracking"]["max_depth"]["median"],
+                               cmp["dlx"]["max_depth"]["median"], "", integer=True)}
+                </tbody>
+            </table>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.caption(
+            f"Each solver ran **{benchmark_runs} times** on the same board. "
+            "Values are median unless otherwise noted. "
+            "A warm-up run was discarded before measuring."
+        )
+
+    # ============ Why DLX wins? ============
+    if cmp["winner"] == "dlx":
+        with st.expander("🎓 Why DLX is faster"):
+            nodes_ratio = (
+                cmp["backtracking"]["nodes"]["median"] /
+                max(cmp["dlx"]["nodes"]["median"], 1)
+            )
+            st.markdown(
+                f"""
+                **Two reasons:**
+
+                1. **MRV heuristic (Minimum Remaining Values)** —
+                   DLX always picks the constraint column with the
+                   *fewest candidates*, which prunes most branches
+                   before they explode. Backtracking picks the first
+                   empty cell — often a poor choice.
+
+                2. **O(1) cover/uncover** — Dancing Links let each
+                   constraint removal be a constant-time pointer
+                   update. Backtracking re-scans rows/columns/boxes
+                   for every `is_valid()` call.
+
+                **On this puzzle:**
+                - Backtracking visited **~{int(cmp['backtracking']['nodes']['median']):,}** nodes
+                - DLX visited only **~{int(cmp['dlx']['nodes']['median']):,}** nodes
+                - That's **{nodes_ratio:.1f}× fewer** nodes explored
+                """
+            )
     tab1, tab2, tab3 = st.tabs(["Solution", "Detection", "Images"])
 
     with tab1:
