@@ -11,6 +11,7 @@ from .solver import (
 from .dlx_solver import solve_dlx as solve_dlx_raw, validate_solution
 from .benchmark import benchmark_puzzle, difficulty_label
 from .pipeline import solve_sudoku_from_image, board_to_text
+from .history import SolveRecord, HistoryStore, make_thumbnail, relative_time
 
-__all__ = ["solve_sudoku_from_image", "board_to_text"]
+__all__ = ["solve_sudoku_from_image", "board_to_text", "SolveRecord", "HistoryStore", "make_thumbnail", "relative_time"]
 __version__ = "1.0.0"

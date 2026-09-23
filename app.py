@@ -10,9 +10,15 @@ import tensorflow as tf
 
 from sudoku_solver.uploader import optimized_image_uploader
 from sudoku_solver import solve_sudoku_from_image, board_to_text
-from sudoku_solver.styles import CUSTOM_CSS, render_board_html
+from sudoku_solver.styles import CUSTOM_CSS, render_board_html, tip
 import streamlit.components.v1 as components
-
+from sudoku_solver.history import (
+    SolveRecord,
+    HistoryStore,
+    make_thumbnail,
+    relative_time,
+)
+from datetime import datetime
 
 # ============================================================
 # Helper: render a stats table row
@@ -105,6 +111,11 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+# Initialize history store
+if "history" not in st.session_state:
+    st.session_state.history = HistoryStore(max_items=20)
+
+history: HistoryStore = st.session_state.history
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # Install keyboard shortcut (once per session)
@@ -132,7 +143,6 @@ with st.sidebar:
     )
 
     st.markdown("## Solver")
-
     solver_choice = st.radio(
         "Algorithm",
         options=[
@@ -180,6 +190,64 @@ with st.sidebar:
         """,
         unsafe_allow_html=True,
     )
+
+    st.markdown("## History")
+
+    if len(history) == 0:
+        st.caption("No solves yet. Solve a puzzle to see it here.")
+    else:
+        st.caption(f"{len(history)} recent solve(s)")
+
+        for record in reversed(history.all()):
+            with st.container():
+                cols = st.columns([1, 3])
+
+                with cols[0]:
+                    if record.thumbnail_png:
+                        st.image(record.thumbnail_png, width=50)
+                    else:
+                        st.markdown("🧩")
+
+                with cols[1]:
+                    emoji = record.difficulty.get("emoji", "🟢")
+                    label = record.difficulty.get("label", "—")
+                    algo_short = "DLX" if record.solver_used == "dlx" else "BT"
+                    time_str = relative_time(record.timestamp)
+
+                    st.markdown(
+                        f"<div style='font-size:0.78rem; line-height:1.3;'>"
+                        f"<b>{emoji} {label}</b><br>"
+                        f"<span style='color:var(--text-muted);'>"
+                        f"{algo_short} · {record.solver_time_ms:.1f}ms · {time_str}"
+                        f"</span>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                    if st.button(
+                        "Load",
+                        key=f"load_{record.id}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["solve_result"] = {
+                            "board":          record.board,
+                            "solution":       record.solution,
+                            "warped":         None,
+                            "warped_solved":  None,
+                            "confidences":    np.ones((9, 9)) * 0.99,
+                            "solved":         record.solved,
+                            "solver_algorithm": record.solver_used,
+                            "solver_time_ms": record.solver_time_ms,
+                            "solver_stats":   {},
+                            "difficulty":     record.difficulty,
+                        }
+                        st.session_state["_last_image_id"] = None
+                        st.rerun()
+
+        st.markdown("---")
+        if st.button("🗑️ Clear history", use_container_width=True):
+            history.clear()
+            st.rerun()
 
     st.markdown("## Resources")
     st.markdown(
@@ -389,6 +457,19 @@ if solve_clicked:
         benchmark_runs,
     )
 
+    # Add to history (only if solved successfully)
+    if result.get("solved"):
+        history.add(SolveRecord(
+            board=result["board"].copy(),
+            solution=result["solution"].copy(),
+            solved=True,
+            difficulty=result.get("difficulty", {}),
+            solver_used=result["solver_algorithm"],
+            solver_time_ms=result["solver_time_ms"],
+            source="upload",
+            thumbnail_png=make_thumbnail(img_bgr),
+        ))
+
 
 # ============================================================
 # Render results (persists across reruns)
@@ -539,11 +620,11 @@ if st.session_state.get("solve_result") is not None:
                                    cmp["backtracking"]["time_ms"]["std"],
                                    cmp["dlx"]["time_ms"]["std"], "ms",
                                    no_ratio=True)}
-                        {_stat_row("Nodes explored",
+                        {_stat_row(f"Nodes explored {tip('nodes_explored')}",
                                    cmp["backtracking"]["nodes"]["median"],
                                    cmp["dlx"]["nodes"]["median"], "",
                                    integer=True)}
-                        {_stat_row("Backtracks / dead-ends",
+                        {_stat_row(f"Backtracks / dead-ends {tip('backtracks')}",
                                    cmp["backtracking"]["backtracks"]["median"],
                                    cmp["dlx"]["backtracks"]["median"], "",
                                    integer=True)}
@@ -629,26 +710,29 @@ if st.session_state.get("solve_result") is not None:
             st.code("\n".join(rows), language=None)
 
     with tab3:
-        col_x, col_y = st.columns(2, gap="large")
-        with col_x:
-            st.markdown('<div class="board-label">Warped grid</div>',
-                        unsafe_allow_html=True)
-            st.image(cv2.cvtColor(warped, cv2.COLOR_BGR2RGB),
-                     use_container_width=True)
-        with col_y:
-            st.markdown('<div class="board-label">With solution (red)</div>',
-                        unsafe_allow_html=True)
-            st.image(cv2.cvtColor(warped_solved, cv2.COLOR_BGR2RGB),
-                     use_container_width=True)
+        if warped is None or warped_solved is None:
+            st.info("📷 Image preview is not available for history-loaded puzzles.")
+        else:
+            col_x, col_y = st.columns(2, gap="large")
+            with col_x:
+                st.markdown('<div class="board-label">Warped grid</div>',
+                            unsafe_allow_html=True)
+                st.image(cv2.cvtColor(warped, cv2.COLOR_BGR2RGB),
+                         use_container_width=True)
+            with col_y:
+                st.markdown('<div class="board-label">With solution (red)</div>',
+                            unsafe_allow_html=True)
+                st.image(cv2.cvtColor(warped_solved, cv2.COLOR_BGR2RGB),
+                         use_container_width=True)
 
-        _, buffer = cv2.imencode(".png", warped_solved)
-        st.download_button(
-            "💾  Download solved image",
-            data=buffer.tobytes(),
-            file_name="sudoku_solved.png",
-            mime="image/png",
-            use_container_width=True,
-        )
+            _, buffer = cv2.imencode(".png", warped_solved)
+            st.download_button(
+                "💾  Download solved image",
+                data=buffer.tobytes(),
+                file_name="sudoku_solved.png",
+                mime="image/png",
+                use_container_width=True,
+            )
 
     # ===== Export section =====
     st.markdown("### 📋 Export")
