@@ -6,8 +6,8 @@ import numpy as np
 from .detector import find_sudoku_grid, warp_perspective, extract_cells
 from .digits import predict_board
 from .solver import solve, is_board_consistent
-from .benchmark import benchmark_puzzle, difficulty_label
-
+from .benchmark import benchmark_puzzle
+from .difficulty import rate_difficulty
 
 def solve_sudoku_from_image(
     img_bgr,
@@ -87,8 +87,8 @@ def solve_sudoku_from_image(
         solved, solution, stats = solve(board, algorithm=algorithm)
         used = algorithm
 
-    # 7. Difficulty
-    diff_label, diff_emoji, diff_color = difficulty_label(board)
+    # 7. Difficulty — scientific rating
+    diff_score = rate_difficulty(board)
 
     # 8. Draw
     report("Rendering result…", 100)
@@ -106,11 +106,7 @@ def solve_sudoku_from_image(
         "solver_algorithm": used,
         "solver_time_ms":   stats.time_ms,
         "solver_stats":     stats.as_dict(),
-        "difficulty": {
-            "label": diff_label,
-            "emoji": diff_emoji,
-            "color": diff_color,
-        },
+        "difficulty":       diff_score.as_dict(),
     }
     if comparison is not None:
         out["comparison"] = comparison

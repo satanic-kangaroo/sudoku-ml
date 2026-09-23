@@ -20,6 +20,11 @@ from sudoku_solver.history import (
 )
 from datetime import datetime
 from sudoku_solver.pdf_export import build_solution_pdf, build_history_pdf
+from sudoku_solver.samples import (
+    generate_random_puzzle_image,
+    get_available_samples,
+    load_sample_image,
+)
 
 # ============================================================
 # Helper: render a stats table row
@@ -459,7 +464,44 @@ if img_bgr is None:
     )
     st.stop()
 
+    st.markdown('<div class="section-label">Or generate one</div>',
+                unsafe_allow_html=True)
 
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        difficulty_target = st.select_slider(
+            "Target difficulty",
+            options=["🟢 Easy", "🟡 Medium", "🟠 Hard", "🔴 Expert"],
+            value="🟡 Medium",
+            help="We'll generate a puzzle targeting this difficulty. "
+                 "The actual score may vary slightly.",
+        )
+
+    with col2:
+        st.markdown('<div style="padding-top:1.9rem;"></div>',
+                    unsafe_allow_html=True)
+        if st.button("🎲 Generate", type="primary",
+                     use_container_width=True):
+            # Map difficulty → hole count
+            holes_map = {
+                "🟢 Easy":   40,
+                "🟡 Medium": 48,
+                "🟠 Hard":   53,
+                "🔴 Expert": 56,
+            }
+            target_holes = holes_map[difficulty_target]
+
+            with st.spinner("Generating..."):
+                img = generate_random_puzzle_image(n_holes=target_holes)
+
+            st.session_state.sample_image_bgr = img
+            st.session_state.sample_meta = {
+                "label": difficulty_target,
+                "emoji": difficulty_target.split()[0],
+                "source": "generated",
+            }
+            st.rerun()
 # ============================================================
 # Clear previous result if image changed
 # ============================================================
@@ -662,16 +704,118 @@ if st.session_state.get("solve_result") is not None:
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
         if diff:
+            score = diff.get("score", 0)
             st.markdown(
                 f'<span class="diff-badge" style="color:{diff["color"]};'
                 f'border-color:{diff["color"]};">'
-                f'{diff["emoji"]} <b>{diff["label"]}</b></span>',
+                f'{diff["emoji"]} <b>{diff["label"]}</b>'
+                f' · <span style="font-weight:500;">{score}/10</span>'
+                f'</span>',
                 unsafe_allow_html=True,
             )
     with c2:
         st.markdown(f"**Solver:** {algo_label}")
     with c3:
         st.markdown(f"**Time:** `{solver_ms:.2f} ms`")
+
+    # Difficulty breakdown (if we have detailed data)
+    if diff and "backtracking_nodes" in diff:
+        with st.expander("📊 Difficulty breakdown"):
+            score = diff.get("score", 0)
+
+            # Score marker on a gradient track
+            marker_pct = (score - 1) / 9 * 100  # map 1..10 to 0..100%
+            st.markdown(
+                f"""
+                <div style="margin:1rem 0 1.25rem 0;">
+                    <div style="position:relative;">
+                        <div style="height:10px;
+                                    background:linear-gradient(90deg,
+                                        #059669 0%,
+                                        #84cc16 25%,
+                                        #eab308 45%,
+                                        #f97316 65%,
+                                        #dc2626 85%,
+                                        #1e293b 100%);
+                                    border-radius:999px;
+                                    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
+                        </div>
+                        <div style="position:absolute;
+                                    top:50%;
+                                    left:{marker_pct:.0f}%;
+                                    transform:translate(-50%, -50%);
+                                    width:20px; height:20px;
+                                    background:#ffffff;
+                                    border:3px solid {diff['color']};
+                                    border-radius:50%;
+                                    box-shadow:0 2px 6px rgba(0,0,0,0.25);
+                                    transition:left 0.5s ease;">
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;
+                                font-size:0.72rem; color:var(--text-muted);
+                                margin-top:0.5rem;
+                                padding:0 4px;">
+                        <span style="font-weight:600;">🟢 Easy</span>
+                        <span>🟡 Medium</span>
+                        <span>🟠 Hard</span>
+                        <span>🔴 Expert</span>
+                        <span style="font-weight:600;">⚫ Evil</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            # Signals table
+            st.markdown(
+                f"""
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>Signal</th>
+                            <th>Value</th>
+                            <th>Normalized</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Givens count</td>
+                            <td class="mono">{diff.get('givens_count', 0)}</td>
+                            <td class="mono">{diff.get('norm_givens', 0):.2f}</td>
+                        </tr>
+                        <tr>
+                            <td>BT nodes (log)</td>
+                            <td class="mono">{diff.get('backtracking_nodes', 0):,}</td>
+                            <td class="mono">{diff.get('norm_bt_nodes', 0):.2f}</td>
+                        </tr>
+                        <tr>
+                            <td>BT backtracks (log)</td>
+                            <td class="mono">{diff.get('backtracking_backtracks', 0):,}</td>
+                            <td class="mono">{diff.get('norm_bt_backtracks', 0):.2f}</td>
+                        </tr>
+                        <tr>
+                            <td>BT max depth</td>
+                            <td class="mono">{diff.get('backtracking_depth', 0)}</td>
+                            <td class="mono">—</td>
+                        </tr>
+                        <tr>
+                            <td>DLX nodes</td>
+                            <td class="mono">{diff.get('dlx_nodes', 0):,}</td>
+                            <td class="mono">—</td>
+                        </tr>
+                    </tbody>
+                </table>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.caption(
+                "Difficulty is computed from three independent signals: "
+                "**BT nodes** (60%), **BT backtracks** (25%), and "
+                "**givens** (15%). BT nodes and backtracks use a log scale "
+                "because difficulty grows exponentially with search effort."
+            )
 
     # ===== COMPARISON MODE =====
     if "comparison" in result:
