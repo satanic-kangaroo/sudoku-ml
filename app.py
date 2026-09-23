@@ -102,6 +102,41 @@ def inject_keyboard_shortcut():
         height=0,
         width=0,
     )
+
+# ============================================================
+# Camera image helper
+# ============================================================
+
+def fix_exif_orientation(img_bgr):
+    """
+    Rotate image based on EXIF orientation if needed.
+    iOS Safari sometimes returns rotated images.
+    """
+    # EXIF data is already stripped by cv2.imdecode, so we can't
+    # read it directly. Instead, we do a sanity check: if the image
+    # is landscape but very wide, it's likely a rotated portrait.
+    # For now, return as-is — most browsers handle rotation correctly.
+    return img_bgr
+
+
+def decode_camera_file(camera_file):
+    """
+    Convert st.camera_input's UploadedFile to a BGR numpy array.
+    Returns (img_bgr, bytes) or (None, None) on failure.
+    """
+    if camera_file is None:
+        return None, None
+
+    try:
+        bytes_data = camera_file.getvalue()
+    except AttributeError:
+        # Fallback for older Streamlit versions
+        bytes_data = camera_file.read()
+
+    img_array = np.frombuffer(bytes_data, dtype=np.uint8)
+    img_bgr = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+    return img_bgr, bytes_data
+
 # ============================================================
 # Page Config
 # ============================================================
@@ -280,42 +315,92 @@ st.markdown(
 
 
 # ============================================================
-# Upload
+# Upload / Camera
 # ============================================================
-st.markdown("### Upload image")
+st.markdown("### Image source")
 
-with st.expander("⚙️ Upload options", expanded=False):
-    col_a, col_b = st.columns(2)
-    with col_a:
-        max_dim = st.slider(
-            "Max dimension (px)",
-            min_value=400, max_value=2000, value=1000, step=100,
-            help="Larger = better detail, but bigger upload.",
-        )
-    with col_b:
-        quality = st.slider(
-            "JPEG quality",
-            min_value=0.5, max_value=0.95, value=0.85, step=0.05,
-            help="Lower = smaller file, faster upload.",
-        )
+tab_upload, tab_camera = st.tabs(["📤 Upload", "📸 Camera"])
 
-uploaded = optimized_image_uploader(
-    max_dimension=max_dim,
-    quality=quality,
-    key="sudoku_uploader",
-)
+# --- Tab 1: Upload (existing behavior) ---
+with tab_upload:
+    with st.expander("⚙️ Upload options", expanded=False):
+        col_a, col_b = st.columns(2)
+        with col_a:
+            max_dim = st.slider(
+                "Max dimension (px)",
+                min_value=400, max_value=2000, value=1000, step=100,
+                help="Larger = better detail, but bigger upload.",
+            )
+        with col_b:
+            quality = st.slider(
+                "JPEG quality",
+                min_value=0.5, max_value=0.95, value=0.85, step=0.05,
+                help="Lower = smaller file, faster upload.",
+            )
+
+    uploaded = optimized_image_uploader(
+        max_dimension=max_dim,
+        quality=quality,
+        key="sudoku_uploader",
+    )
+
+# --- Tab 2: Camera (new) ---
+with tab_camera:
+    st.caption(
+        "📱 **Tip:** Hold your phone parallel to the grid for the best "
+        "results. Make sure all four corners are visible."
+    )
+
+    camera_file = st.camera_input(
+        "Take a photo",
+        key="sudoku_camera",
+        help="Use your device's camera to capture the Sudoku puzzle",
+    )
+
+    camera_img_bgr, camera_bytes = decode_camera_file(camera_file)
+
+
+# ============================================================
+# Determine image source
+# ============================================================
+img_bgr = None
+image_source = None
+uploaded_name = ""
+uploaded_size = 0
+uploaded_opt_size = 0
+uploaded_width = 0
+uploaded_height = 0
+
+if uploaded is not None:
+    img_bytes = uploaded["bytes"]
+    img_array = np.frombuffer(img_bytes, dtype=np.uint8)
+    img_bgr = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+    image_source = "upload"
+    uploaded_name = uploaded.get("name", "upload.jpg")
+    uploaded_size = uploaded.get("original_size", 0)
+    uploaded_opt_size = uploaded.get("optimized_size", 0)
+    uploaded_width = uploaded.get("width", 0)
+    uploaded_height = uploaded.get("height", 0)
+
+elif camera_img_bgr is not None:
+    img_bgr = camera_img_bgr
+    image_source = "camera"
+    uploaded_name = "camera.jpg"
+    uploaded_size = len(camera_bytes)
+    uploaded_opt_size = len(camera_bytes)
+    uploaded_height, uploaded_width = camera_img_bgr.shape[:2]
 
 
 # ============================================================
 # Empty state
 # ============================================================
-if uploaded is None:
+if img_bgr is None:
     st.markdown(
         """
         <div class="empty-state" style="margin-top:1.5rem;">
             <span class="icon">📷</span>
             <h3>No image yet</h3>
-            <p>Drop or choose a Sudoku photo to get started</p>
+            <p>Upload a photo or take one with your camera to get started</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -339,15 +424,14 @@ if uploaded is None:
 
 
 # ============================================================
-# Decode
+# Clear previous result if image changed
 # ============================================================
-img_bytes = uploaded["bytes"]
-img_array = np.frombuffer(img_bytes, dtype=np.uint8)
-img_bgr = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+_current_image_id = f"{image_source}_{uploaded_name}_{uploaded_size}"
 
-if img_bgr is None:
-    st.error("❌ Could not decode image.")
-    st.stop()
+if st.session_state.get("_last_image_id") != _current_image_id:
+    st.session_state["_last_image_id"] = _current_image_id
+    st.session_state["solve_result"] = None
+    st.session_state["solve_signature"] = None
 
 # If the image has changed, clear the previous result
 _current_image_id = None
@@ -362,18 +446,20 @@ if st.session_state.get("_last_image_id") != _current_image_id:
     st.session_state["solve_signature"] = None
 
 
-# ============================================================
-# Upload stats
-# ============================================================
-orig_kb = uploaded["original_size"] / 1024
-new_kb  = uploaded["optimized_size"] / 1024
-saving  = (1 - uploaded["optimized_size"] / max(uploaded["original_size"], 1)) * 100
+if image_source == "upload":
+    orig_kb = uploaded_size / 1024
+    new_kb  = uploaded_opt_size / 1024
+    saving  = (1 - uploaded_opt_size / max(uploaded_size, 1)) * 100
 
-m1, m2, m3 = st.columns(3)
-m1.metric("Original",   f"{orig_kb:.1f} KB")
-m2.metric("Optimized",  f"{new_kb:.1f} KB", delta=f"−{saving:.0f}%")
-m3.metric("Dimensions", f"{uploaded['width']}×{uploaded['height']}")
-
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Original",   f"{orig_kb:.1f} KB")
+    m2.metric("Optimized",  f"{new_kb:.1f} KB", delta=f"−{saving:.0f}%")
+    m3.metric("Dimensions", f"{uploaded_width}×{uploaded_height}")
+else:
+    kb = uploaded_size / 1024
+    m1, m2 = st.columns(2)
+    m1.metric("Source",     "📸 Camera")
+    m2.metric("Dimensions", f"{uploaded_width}×{uploaded_height}")
 
 # ============================================================
 # Preview + Solve
@@ -466,10 +552,9 @@ if solve_clicked:
             difficulty=result.get("difficulty", {}),
             solver_used=result["solver_algorithm"],
             solver_time_ms=result["solver_time_ms"],
-            source="upload",
+            source=image_source,
             thumbnail_png=make_thumbnail(img_bgr),
         ))
-
 
 # ============================================================
 # Render results (persists across reruns)
