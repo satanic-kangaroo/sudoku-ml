@@ -329,3 +329,133 @@ def validate_solution(board: np.ndarray) -> bool:
             if set(board[br:br + 3, bc:bc + 3].flatten()) != target:
                 return False
     return True
+
+def count_solutions(board: np.ndarray, limit: int = 2) -> int:
+    """
+    Count the number of solutions up to `limit`, using DLX.
+
+    Args:
+        board: 9×9 puzzle (0 = empty)
+        limit: stop counting after finding this many solutions
+
+    Returns:
+        Number of solutions found (at most `limit`).
+    """
+    root, cols = _build_dlx()
+
+    # ---- Forbid rows that conflict with givens ----
+    forbidden = set()
+
+    for r in range(9):
+        for c in range(9):
+            d = int(board[r, c])
+            if d == 0:
+                continue
+
+            for d2 in range(1, 10):
+                if d2 != d:
+                    forbidden.add(_row_id(r, c, d2))
+
+            for cc in range(9):
+                if cc != c:
+                    forbidden.add(_row_id(r, cc, d))
+
+            for rr in range(9):
+                if rr != r:
+                    forbidden.add(_row_id(rr, c, d))
+
+            br, bc = 3 * (r // 3), 3 * (c // 3)
+            for rr in range(br, br + 3):
+                for cc in range(bc, bc + 3):
+                    if (rr, cc) != (r, c):
+                        forbidden.add(_row_id(rr, cc, d))
+
+    def _unlink_forbidden(node: Node) -> None:
+        j = node
+        while True:
+            j.D.U = j.U
+            j.U.D = j.D
+            j.C.size -= 1
+            j = j.R
+            if j is node:
+                break
+
+    for col in cols:
+        i = col.D
+        while i is not col:
+            nxt = i.D
+            if i.row_id in forbidden:
+                _unlink_forbidden(i)
+            i = nxt
+
+    # ---- Pin given rows by covering their columns ----
+    for r in range(9):
+        for c in range(9):
+            d = int(board[r, c])
+            if d == 0:
+                continue
+            row_id = _row_id(r, c, d)
+            col = cols[_col_cell(r, c)]
+            i = col.D
+            while i is not col and i.row_id != row_id:
+                i = i.D
+            if i is col:
+                continue
+
+            j = i.R
+            while j is not i:
+                _cover(j.C)
+                j = j.R
+            _cover(i.C)
+
+    # ---- Count solutions ----
+    counter = [0]
+
+    def _search_count(root: Node, depth: int = 0) -> None:
+        if counter[0] >= limit:
+            return
+
+        if root.R is root:
+            counter[0] += 1
+            return
+
+        # MRV heuristic
+        c = root.R
+        min_size = c.size
+        j = c.R
+        while j is not root:
+            if j.size < min_size:
+                min_size = j.size
+                c = j
+                if min_size == 1:
+                    break
+            j = j.R
+
+        if min_size == 0:
+            return
+
+        _cover(c)
+
+        r = c.D
+        while r is not c:
+            if counter[0] >= limit:
+                break
+
+            j = r.R
+            while j is not r:
+                _cover(j.C)
+                j = j.R
+
+            _search_count(root, depth + 1)
+
+            j = r.L
+            while j is not r:
+                _uncover(j.C)
+                j = j.L
+
+            r = r.D
+
+        _uncover(c)
+
+    _search_count(root)
+    return counter[0]
