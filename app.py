@@ -11,6 +11,7 @@ import tensorflow as tf
 from sudoku_solver.uploader import optimized_image_uploader
 from sudoku_solver import solve_sudoku_from_image, board_to_text
 from sudoku_solver.styles import CUSTOM_CSS, render_board_html
+import streamlit.components.v1 as components
 
 
 # ============================================================
@@ -51,6 +52,51 @@ def _stat_row(label, v_bt, v_dlx, unit="", emphasize=False,
 
 
 # ============================================================
+# Keyboard shortcut helper
+# ============================================================
+
+def inject_keyboard_shortcut():
+    """
+    Install a global Ctrl+Enter / Cmd+Enter listener via an iframe
+    component, which Streamlit doesn't sanitize.
+    """
+    components.html(
+        """
+        <script>
+        (function() {
+            var KEY = '__sudoku_kb_installed_v2';
+            var doc = window.parent.document;
+
+            if (doc[KEY]) return;
+            doc[KEY] = true;
+
+            console.log('[Sudoku ML] Keyboard shortcut installed');
+
+            doc.addEventListener('keydown', function(e) {
+                // Ctrl+Enter (Windows/Linux) or Cmd+Enter (Mac)
+                if (!(e.ctrlKey || e.metaKey)) return;
+                if (e.key !== 'Enter' && e.code !== 'Enter') return;
+
+                var buttons = doc.querySelectorAll('button');
+                for (var i = 0; i < buttons.length; i++) {
+                    var b = buttons[i];
+                    var txt = (b.innerText || b.textContent || '').trim();
+                    if (txt.indexOf('Solve puzzle') !== -1) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('[Sudoku ML] Triggering solve');
+                        b.click();
+                        return;
+                    }
+                }
+            }, true);  // capture phase
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+# ============================================================
 # Page Config
 # ============================================================
 st.set_page_config(
@@ -61,6 +107,8 @@ st.set_page_config(
 )
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+# Install keyboard shortcut (once per session)
+inject_keyboard_shortcut()
 
 # ============================================================
 # Model Loading
@@ -245,6 +293,7 @@ if st.session_state.get("_last_image_id") != _current_image_id:
     st.session_state["solve_result"] = None
     st.session_state["solve_signature"] = None
 
+
 # ============================================================
 # Upload stats
 # ============================================================
@@ -288,6 +337,7 @@ with col_action:
         "🚀  Solve puzzle",
         type="primary",
         use_container_width=True,
+        help="Tip: Ctrl+Enter (Cmd+Enter on Mac) to solve",
     )
 
 # ============================================================
