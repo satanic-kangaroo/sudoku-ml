@@ -893,166 +893,85 @@ details summary:hover { color: var(--primary) !important; }
     background: var(--surface-hover);
     border: 1px solid var(--border);
 }
+
 /* ============================================================
-   SOLVER COMPARISON
+   TOOLTIPS (match Streamlit's native style)
    ============================================================ */
-.race-container {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    margin: 1rem 0;
-    padding: 1rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-}
-
-.race-row {
-    display: grid;
-    grid-template-columns: 130px 1fr 100px;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 0.9rem;
-}
-
-.race-label {
-    font-weight: 700;
-    color: var(--text);
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-}
-
-.race-track {
-    position: relative;
-    height: 26px;
-    background: var(--surface-hover);
-    border-radius: 6px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-}
-
-.race-bar {
-    height: 100%;
-    border-radius: 5px;
-    transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1);
-    display: flex;
-    align-items: center;
-    padding-left: 0.5rem;
-    color: white;
-    font-weight: 700;
-    font-size: 0.75rem;
-}
-
-.race-bar.bar-bt {
-    background: linear-gradient(90deg, #f59e0b, #ea580c);
-}
-
-.race-bar.bar-dlx {
-    background: linear-gradient(90deg, #4f46e5, #7c3aed);
-}
-
-.race-time {
-    font-family: var(--font-mono);
-    font-weight: 700;
-    color: var(--text);
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    font-size: 0.85rem;
-}
-
-.winner-card {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem 1.25rem;
-    background: linear-gradient(135deg, #fef3c7, #fde68a);
-    border: 1px solid #fbbf24;
-    border-radius: 12px;
-    margin: 0.75rem 0;
-    box-shadow: 0 2px 12px rgba(251, 191, 36, 0.25);
-}
-
-@media (prefers-color-scheme: dark) {
-    .winner-card {
-        background: linear-gradient(135deg, #422006, #713f12);
-        border-color: #a16207;
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
-    }
-}
-
-.winner-card .trophy {
-    font-size: 1.75rem;
-}
-
-.winner-card .winner-info {
-    flex: 1;
-}
-
-.winner-card .winner-name {
-    font-weight: 800;
-    font-size: 1rem;
-    color: var(--text);
-}
-
-.winner-card .winner-sub {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-top: 0.15rem;
-}
-
-.stats-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
-    margin: 0.5rem 0;
-}
-
-.stats-table th {
-    text-align: left;
-    padding: 0.6rem 0.8rem;
-    color: var(--text-muted);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: 0.72rem;
-    border-bottom: 1px solid var(--border);
-}
-
-.stats-table td {
-    padding: 0.55rem 0.8rem;
-    border-bottom: 1px solid var(--border);
-    font-variant-numeric: tabular-nums;
-    color: var(--text);
-}
-
-.stats-table td.mono {
-    font-family: var(--font-mono);
-}
-
-.stats-table tr:last-child td {
-    border-bottom: none;
-}
-
-.stats-table td.win {
-    color: var(--success);
-    font-weight: 700;
-}
-
-.diff-badge {
+.tip {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.3rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.78rem;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--border);
+    color: var(--text-muted);
+    font-size: 10px;
     font-weight: 700;
-    background: var(--surface-hover);
-    border: 1px solid var(--border);
+    cursor: help;
+    position: relative;
+    margin-left: 5px;
+    vertical-align: middle;
+    line-height: 1;
+    user-select: none;
+}
+
+.tip:hover {
+    background: var(--primary);
+    color: #fff;
+}
+
+.tip .tip-text {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: -4px;                       /* anchor near icon's left */
+    background: #262730;
+    color: #fafafa;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    line-height: 1.5;
+    width: max-content;
+    max-width: 260px;
+    text-align: left;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: opacity 0.12s ease;
+    z-index: 999999;
+    pointer-events: auto;             /* hover on tooltip itself */
+    white-space: normal;
+}
+
+/* Invisible bridge so mouse can travel from icon → tooltip */
+.tip .tip-text::before {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    height: 12px;
+    background: transparent;
+}
+
+/* Arrow at bottom-left pointing to icon */
+.tip .tip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 8px;
+    margin-top: -1px;
+    border: 6px solid transparent;
+    border-top-color: #262730;
+}
+
+.tip:hover .tip-text {
+    visibility: visible;
+    opacity: 1;
 }
 </style>
 """
-
 
 def render_board_html(board, given_mask=None, solved_mask=None):
     """Render a 9x9 board as HTML (theme-adaptive via CSS variables)."""
@@ -1092,4 +1011,16 @@ def render_board_html(board, given_mask=None, solved_mask=None):
         '<div class="board-wrapper">'
         '<div class="sudoku-board">' + "".join(cells) + "</div>"
         "</div>"
+    )
+
+def tip(key: str) -> str:
+    """Render a tooltip icon with HTML."""
+    from .glossary import GLOSSARY
+    entry = GLOSSARY.get(key)
+    if not entry:
+        return ""
+    return (
+        f'<span class="tip">?'
+        f'<span class="tip-text"><b>{entry["short"]}</b><br>'
+        f'{entry["long"]}</span></span>'
     )
