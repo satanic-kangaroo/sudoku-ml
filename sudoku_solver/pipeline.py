@@ -20,6 +20,24 @@ def solve_sudoku_from_image(
 ):
     """
     Full pipeline from image to solution.
+
+    Args:
+        img_bgr:               input image (BGR numpy array)
+        model:                 loaded Keras model
+        confidence_threshold:  digit acceptance threshold (0..1)
+        algorithm:             "backtracking" | "dlx"
+        compare_mode:          if True, run both and compare timings
+        benchmark_runs:        runs per solver in compare mode
+        progress_callback:     function(step_msg, percent)
+
+    Returns:
+        dict with keys:
+            board, solution, warped, warped_solved,
+            confidences, solved,
+            solver_algorithm, solver_time_ms, solver_stats,
+            difficulty,
+            comparison (only when compare_mode=True)
+            error (only on failure)
     """
     def report(msg, pct):
         if progress_callback:
@@ -29,8 +47,10 @@ def solve_sudoku_from_image(
     report("Detecting grid…", 10)
     corners = find_sudoku_grid(img_bgr)
     if corners is None:
-        return {"error": "Could not find a Sudoku grid in the image.",
-                "solved": False}
+        return {
+            "error": "Could not find a Sudoku grid in the image.",
+            "solved": False,
+        }
 
     # 2. Warp
     report("Correcting perspective…", 30)
@@ -60,6 +80,7 @@ def solve_sudoku_from_image(
     if compare_mode:
         report(f"Benchmarking ({benchmark_runs} runs each)…", 90)
         comparison = benchmark_puzzle(board, runs=benchmark_runs)
+        # Use DLX as canonical solution
         solved, solution, stats = solve(board, algorithm="dlx")
         used = "dlx"
     else:
@@ -112,3 +133,62 @@ def draw_solution(warped, original, solution):
                     (0, 0, 255), 3,
                 )
     return output
+
+
+# ============================================================
+# Board serialization helpers
+# ============================================================
+
+def board_to_text(board, style: str = "dots") -> str:
+    """
+    Convert a 9×9 board to text in various formats.
+
+    Args:
+        board: np.ndarray (9, 9) ints 0-9 (0 = empty)
+        style: one of "dots", "zeros", "grid", "compact"
+
+    Returns:
+        Formatted string.
+    """
+    if style == "compact":
+        return "".join(str(int(board[r, c])) for r in range(9) for c in range(9))
+
+    if style == "dots":
+        lines = []
+        for r in range(9):
+            row = [
+                str(int(board[r, c])) if board[r, c] != 0 else "."
+                for c in range(9)
+            ]
+            lines.append(" ".join(row))
+        return "\n".join(lines)
+
+    if style == "zeros":
+        lines = []
+        for r in range(9):
+            lines.append(" ".join(str(int(x)) for x in board[r]))
+        return "\n".join(lines)
+
+    if style == "grid":
+        def cell(v):
+            return str(int(v)) if v != 0 else "."
+
+        lines = ["+-------+-------+-------+"]
+
+        for r in range(9):
+            cells = [cell(board[r, c]) for c in range(9)]
+            row = "| " + " ".join(cells[0:3]) + " | " \
+                       + " ".join(cells[3:6]) + " | " \
+                       + " ".join(cells[6:9]) + " |"
+            lines.append(row)
+
+            if r in (2, 5):
+                lines.append("+-------+-------+-------+")
+
+        lines.append("+-------+-------+-------+")
+        return "\n".join(lines)
+
+    raise ValueError(
+        f"Unknown style: {style!r}. "
+        f"Expected one of: dots, zeros, grid, compact"
+    )

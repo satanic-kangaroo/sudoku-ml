@@ -9,7 +9,7 @@ import streamlit as st
 import tensorflow as tf
 
 from sudoku_solver.uploader import optimized_image_uploader
-from sudoku_solver import solve_sudoku_from_image
+from sudoku_solver import solve_sudoku_from_image, board_to_text
 from sudoku_solver.styles import CUSTOM_CSS, render_board_html
 
 
@@ -233,6 +233,17 @@ if img_bgr is None:
     st.error("❌ Could not decode image.")
     st.stop()
 
+# If the image has changed, clear the previous result
+_current_image_id = None
+if uploaded is not None:
+    _current_image_id = f"upload_{uploaded.get('name', '')}_{len(uploaded.get('bytes', b''))}"
+elif st.session_state.get("sample_image_bgr") is not None:
+    _current_image_id = f"sample_{id(st.session_state['sample_image_bgr'])}"
+
+if st.session_state.get("_last_image_id") != _current_image_id:
+    st.session_state["_last_image_id"] = _current_image_id
+    st.session_state["solve_result"] = None
+    st.session_state["solve_signature"] = None
 
 # ============================================================
 # Upload stats
@@ -279,9 +290,18 @@ with col_action:
         use_container_width=True,
     )
 
+# ============================================================
+# Resolve solver settings (always available, outside conditionals)
+# ============================================================
+compare_mode = solver_choice == "Compare both"
+algorithm = (
+    "dlx" if solver_choice == "DLX (Dancing Links)"
+    else "backtracking"
+)
+
 
 # ============================================================
-# Solve
+# Solve (only when button clicked)
 # ============================================================
 if solve_clicked:
     progress_bar = st.progress(0)
@@ -297,12 +317,6 @@ if solve_clicked:
     with st.spinner("Loading model…"):
         model = load_model()
 
-    compare_mode = solver_choice == "Compare both"
-    algorithm = (
-        "dlx" if solver_choice == "DLX (Dancing Links)"
-        else "backtracking"
-    )
-
     result = solve_sudoku_from_image(
         img_bgr,
         model,
@@ -315,6 +329,31 @@ if solve_clicked:
 
     progress_bar.empty()
     status_text.empty()
+
+    # Save result to session_state
+    st.session_state["solve_result"] = result
+    st.session_state["solve_signature"] = (
+        solver_choice,
+        confidence_threshold,
+        compare_mode,
+        benchmark_runs,
+    )
+
+
+# ============================================================
+# Render results (persists across reruns)
+# ============================================================
+if st.session_state.get("solve_result") is not None:
+    result = st.session_state["solve_result"]
+
+    # Warn if settings changed since last solve
+    current_sig = (solver_choice, confidence_threshold, compare_mode, benchmark_runs)
+    prev_sig = st.session_state.get("solve_signature")
+    if prev_sig is not None and current_sig != prev_sig:
+        st.info(
+            "⚙️ Settings changed since the last solve. "
+            "Click **Solve puzzle** to re-run with the new settings."
+        )
 
     if "error" in result:
         st.error(f"❌ {result['error']}")
@@ -329,7 +368,6 @@ if solve_clicked:
     solved          = result["solved"]
     used_algo       = result["solver_algorithm"]
     solver_ms       = result["solver_time_ms"]
-    solver_stats    = result.get("solver_stats", {})
     diff            = result.get("difficulty", {})
 
     st.markdown("---")
@@ -371,7 +409,6 @@ if solve_clicked:
         st.markdown("---")
         st.markdown("## ⚖️ Solver comparison")
 
-        # Winner card
         if cmp["winner"] == "tie":
             st.info("🤝 Both solvers finished in almost identical time.")
         else:
@@ -394,7 +431,6 @@ if solve_clicked:
                 unsafe_allow_html=True,
             )
 
-        # Race bars
         t_bt  = cmp["backtracking"]["time_ms"]["median"]
         t_dlx = cmp["dlx"]["time_ms"]["median"]
         t_max = max(t_bt, t_dlx, 0.01)
@@ -423,7 +459,6 @@ if solve_clicked:
             unsafe_allow_html=True,
         )
 
-        # Detailed stats table
         with st.expander("📊 Detailed statistics", expanded=True):
             st.markdown(
                 f"""
@@ -478,7 +513,6 @@ if solve_clicked:
                 "A warm-up run was discarded before measuring."
             )
 
-        # Why DLX wins?
         if cmp["winner"] == "dlx":
             with st.expander("🎓 Why DLX is faster"):
                 nodes_ratio = (
@@ -565,6 +599,45 @@ if solve_clicked:
             mime="image/png",
             use_container_width=True,
         )
+
+    # ===== Export section =====
+    st.markdown("### 📋 Export")
+    st.caption(
+        "Copy the puzzle in a format that fits your workflow. "
+        "Click the copy icon in the top-right corner of any block."
+    )
+
+    export_choice = st.radio(
+        "Format",
+        options=[
+            "🔤 Compact  ·  single line",
+            "🔡 Dots     ·  human-readable",
+            "🔢 Zeros    ·  code-friendly",
+            "📦 Grid     ·  ASCII art",
+        ],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="export_format_choice",
+    )
+
+    style_map = {
+        "🔤 Compact  ·  single line": "compact",
+        "🔡 Dots     ·  human-readable": "dots",
+        "🔢 Zeros    ·  code-friendly": "zeros",
+        "📦 Grid     ·  ASCII art": "grid",
+    }
+    chosen_style = style_map[export_choice]
+
+    text = board_to_text(board, style=chosen_style)
+    st.code(text, language=None)
+
+    hints = {
+        "compact": "Paste into solvers, scripts, or URL parameters.",
+        "dots":    "Human-readable, great for sharing on forums.",
+        "zeros":   "Directly importable in most Sudoku libraries.",
+        "grid":    "Visual preview — good for screenshots.",
+    }
+    st.caption(hints[chosen_style])
 
     # ===== Stats =====
     st.markdown("### Stats")
