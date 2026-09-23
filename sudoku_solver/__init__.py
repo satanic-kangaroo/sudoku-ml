@@ -23,6 +23,7 @@ from .samples import (
     get_available_samples,
     load_sample_image,
 )
+from .difficulty import rate_difficulty, DifficultyScore
 
 __all__ = [
     "solve_sudoku_from_image",
@@ -41,5 +42,7 @@ __all__ = [
     "get_difficulty_from_holes",
     "get_available_samples",
     "load_sample_image",
+    "rate_difficulty",
+    "DifficultyScore",
 ]
 __version__ = "1.0.0"
