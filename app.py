@@ -19,6 +19,7 @@ from sudoku_solver.history import (
     relative_time,
 )
 from datetime import datetime
+from sudoku_solver.pdf_export import build_solution_pdf, build_history_pdf
 
 # ============================================================
 # Helper: render a stats table row
@@ -280,8 +281,44 @@ with st.sidebar:
                         st.rerun()
 
         st.markdown("---")
+
+        # Step 1: Prepare button (stores bytes in session_state)
+        if st.button("📄  Prepare PDF export", use_container_width=True):
+            history_records = []
+            for r in history.all():
+                history_records.append({
+                    "board":          r.board,
+                    "solution":       r.solution,
+                    "difficulty":     r.difficulty,
+                    "solver_used":    r.solver_used,
+                    "solver_time_ms": r.solver_time_ms,
+                    "timestamp":      r.timestamp,
+                    "thumbnail_png":  r.thumbnail_png,
+                })
+            try:
+                st.session_state["history_pdf_bytes"] = build_history_pdf(history_records)
+                st.session_state["history_pdf_error"] = None
+            except Exception as e:
+                st.session_state["history_pdf_bytes"] = None
+                st.session_state["history_pdf_error"] = str(e)
+
+        # Step 2: Show download button (persists across reruns)
+        if st.session_state.get("history_pdf_bytes"):
+            st.download_button(
+                "⬇️  Download history PDF",
+                data=st.session_state["history_pdf_bytes"],
+                file_name=f"sudoku_history_{datetime.now():%Y%m%d}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="history_pdf_download",
+            )
+        elif st.session_state.get("history_pdf_error"):
+            st.error(f"❌ {st.session_state['history_pdf_error']}")
+
         if st.button("🗑️ Clear history", use_container_width=True):
             history.clear()
+            st.session_state["history_pdf_bytes"] = None
+            st.session_state["history_pdf_error"] = None
             st.rerun()
 
     st.markdown("## Resources")
@@ -505,7 +542,7 @@ algorithm = (
 
 
 # ============================================================
-# Solve (only when button clicked)
+# Save result to session_state
 # ============================================================
 if solve_clicked:
     progress_bar = st.progress(0)
@@ -542,6 +579,8 @@ if solve_clicked:
         compare_mode,
         benchmark_runs,
     )
+    # Clear old PDF bytes
+    st.session_state["solution_pdf_bytes"] = None
 
     # Add to history (only if solved successfully)
     if result.get("solved"):
@@ -555,6 +594,22 @@ if solve_clicked:
             source=image_source,
             thumbnail_png=make_thumbnail(img_bgr),
         ))
+
+        # Pre-generate PDF bytes and store in session_state
+        try:
+            pdf_record = {
+                "board":          result["board"],
+                "solution":       result["solution"],
+                "difficulty":     result.get("difficulty", {}),
+                "solver_used":    result["solver_algorithm"],
+                "solver_time_ms": result["solver_time_ms"],
+                "timestamp":      datetime.now(),
+                "thumbnail_png":  make_thumbnail(img_bgr, size=200),
+            }
+            st.session_state["solution_pdf_bytes"] = build_solution_pdf(pdf_record)
+        except Exception as e:
+            st.session_state["solution_pdf_bytes"] = None
+            st.session_state["solution_pdf_error"] = str(e)
 
 # ============================================================
 # Render results (persists across reruns)
@@ -810,14 +865,41 @@ if st.session_state.get("solve_result") is not None:
                 st.image(cv2.cvtColor(warped_solved, cv2.COLOR_BGR2RGB),
                          use_container_width=True)
 
+        col_png, col_pdf = st.columns(2)
+
+        with col_png:
             _, buffer = cv2.imencode(".png", warped_solved)
             st.download_button(
-                "💾  Download solved image",
+                "💾  Download PNG",
                 data=buffer.tobytes(),
                 file_name="sudoku_solved.png",
                 mime="image/png",
                 use_container_width=True,
+                key="png_download",
             )
+
+        with col_pdf:
+            pdf_bytes = st.session_state.get("solution_pdf_bytes")
+            pdf_error = st.session_state.get("solution_pdf_error")
+
+            if pdf_bytes:
+                st.download_button(
+                    "📄  Download PDF",
+                    data=pdf_bytes,
+                    file_name="sudoku_solution.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key="pdf_download",
+                )
+            elif pdf_error:
+                st.error(f"❌ PDF failed: {pdf_error}")
+            else:
+                st.button(
+                    "📄  PDF unavailable",
+                    disabled=True,
+                    use_container_width=True,
+                    key="pdf_disabled",
+                )
 
     # ===== Export section =====
     st.markdown("### 📋 Export")

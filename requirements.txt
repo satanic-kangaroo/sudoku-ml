@@ -6,3 +6,4 @@ pillow
 tqdm
 matplotlib
 scikit-learn
+reportlab
