@@ -4,21 +4,12 @@ from .digits import clean_cell, predict_board
 from .solver import (
     solve,
     solve_backtracking,
-    solve_dlx as solve_dlx_timed,
+    solve_dlx,
     is_board_consistent,
     SolveStats,
 )
-from .dlx_solver import solve_dlx, validate_solution
+from .dlx_solver import solve_dlx as solve_dlx_raw, validate_solution
 from .benchmark import benchmark_puzzle, difficulty_label
 from .pipeline import solve_sudoku_from_image
 
 __version__ = "1.0.0"
-__all__ = [
-    "find_sudoku_grid", "warp_perspective", "extract_cells",
-    "clean_cell", "predict_board",
-    "solve", "solve_backtracking", "solve_dlx_timed",
-    "is_board_consistent", "SolveStats",
-    "solve_dlx", "validate_solution",
-    "benchmark_puzzle", "difficulty_label",
-    "solve_sudoku_from_image",
-]
